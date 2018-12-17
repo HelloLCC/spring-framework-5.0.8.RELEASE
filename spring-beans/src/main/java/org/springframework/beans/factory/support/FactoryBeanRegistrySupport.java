@@ -94,10 +94,14 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 	 * @see org.springframework.beans.factory.FactoryBean#getObject()
 	 */
 	protected Object getObjectFromFactoryBean(FactoryBean<?> factory, String beanName, boolean shouldPostProcess) {
+		// 如果是单例的，并且singletonObjects缓存中存在beanName对应的实例
 		if (factory.isSingleton() && containsSingleton(beanName)) {
 			synchronized (getSingletonMutex()) {
+				// factoryBeanObjectCache存放的是FactoryBeanName --> FactoryBean::getObject()返回值的对应关系
 				Object object = this.factoryBeanObjectCache.get(beanName);
+				// 找到了就直接返回，没有找到就调用FactoryBean::getObject()方法创建实例Bean
 				if (object == null) {
+					// 调用FactoryBean::getObject()创建Bean
 					object = doGetObjectFromFactoryBean(factory, beanName);
 					// Only post-process and store if not put there already during getObject() call above
 					// (e.g. because of circular reference processing triggered by custom getBean calls)
@@ -120,10 +124,12 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 										"Post-processing of FactoryBean's singleton object failed", ex);
 							}
 							finally {
+								// 钩子方法
 								afterSingletonCreation(beanName);
 							}
 						}
 						if (containsSingleton(beanName)) {
+							// FactoryBean::getObject()方法已经调用完成了，放进缓存
 							this.factoryBeanObjectCache.put(beanName, object);
 						}
 					}
@@ -132,6 +138,7 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 			}
 		}
 		else {
+			// 如果不是单例模式的时候就没有那么多操作了
 			Object object = doGetObjectFromFactoryBean(factory, beanName);
 			if (shouldPostProcess) {
 				try {
@@ -158,6 +165,7 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 
 		Object object;
 		try {
+			// 如果factoryBean对象操作受SecurityManager保护，进行特权操作
 			if (System.getSecurityManager() != null) {
 				AccessControlContext acc = getAccessControlContext();
 				try {
@@ -168,6 +176,7 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 				}
 			}
 			else {
+				// 没有权限验证的话直接调用
 				object = factory.getObject();
 			}
 		}
@@ -185,6 +194,7 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 				throw new BeanCurrentlyInCreationException(
 						beanName, "FactoryBean which is currently in creation returned null from getObject");
 			}
+			// TODO spring5添加的吧
 			object = new NullBean();
 		}
 		return object;

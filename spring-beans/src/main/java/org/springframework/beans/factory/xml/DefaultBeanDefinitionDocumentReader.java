@@ -172,9 +172,13 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 				if (node instanceof Element) {
 					Element ele = (Element) node;
 					if (delegate.isDefaultNamespace(ele)) {
+						// 对默认标签进行解析
+						// 类似<import> \ <bean> \ <alias> \ <beans> etc. spring 原生标签
 						parseDefaultElement(ele, delegate);
 					}
 					else {
+						// 自定义标签解析
+						// 类似引入其他命名空间的标签<a:bean name="value">
 						delegate.parseCustomElement(ele);
 					}
 				}
@@ -188,6 +192,7 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 	private void parseDefaultElement(Element ele, BeanDefinitionParserDelegate delegate) {
 		if (delegate.nodeNameEquals(ele, IMPORT_ELEMENT)) {
 			// 对import标签的解析
+			// 其实就是找到resource配置文件的绝对地址，然后递归调用bean的解析过程，其实就是新的一次xml配置文件的解析过程
 			importBeanDefinitionResource(ele);
 		}
 		else if (delegate.nodeNameEquals(ele, ALIAS_ELEMENT)) {
@@ -201,6 +206,7 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 		else if (delegate.nodeNameEquals(ele, NESTED_BEANS_ELEMENT)) {
 			// recurse
 			// 对beans标签的处理
+			// 跟import配置的解析十分相似
 			doRegisterBeanDefinitions(ele);
 		}
 	}
@@ -210,6 +216,7 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 	 * from the given resource into the bean factory.
 	 */
 	protected void importBeanDefinitionResource(Element ele) {
+		// 获取<import></import>标签resource属性
 		String location = ele.getAttribute(RESOURCE_ATTRIBUTE);
 		if (!StringUtils.hasText(location)) {
 			getReaderContext().error("Resource location must not be empty", ele);
@@ -278,6 +285,7 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 	 * Process the given alias element, registering the alias with the registry.
 	 */
 	protected void processAliasRegistration(Element ele) {
+		// 提取<alias></alias>标签中的name和alias属性
 		String name = ele.getAttribute(NAME_ATTRIBUTE);
 		String alias = ele.getAttribute(ALIAS_ATTRIBUTE);
 		boolean valid = true;
@@ -291,12 +299,14 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 		}
 		if (valid) {
 			try {
+				// 注册alias
 				getReaderContext().getRegistry().registerAlias(name, alias);
 			}
 			catch (Exception ex) {
 				getReaderContext().error("Failed to register alias '" + alias +
 						"' for bean with name '" + name + "'", ele, ex);
 			}
+			// 广播alias注册事件跟之前的广播BeanDefinition注册事件类似，都是在架构设计层面考虑可拓展
 			getReaderContext().fireAliasRegistered(name, alias, extractSource(ele));
 		}
 	}
