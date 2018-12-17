@@ -529,13 +529,15 @@ public class BeanDefinitionParserDelegate {
 			// 下面就是spring的一些高级玩法，meta标签设置元数据信息，设置到BeanDefinition的BeanMetadataAttribute中，
 			// 需要使用的时候通过 BeanDefinition 的 getAttribute() 获取
 			parseMetaElements(ele, bd);
-
+			// lookup-method ：获取器注入，是把一个方法声明为返回某种类型的 bean 但实际要返回的 bean 是在配置文件里面配置的。该方法可以用于设计一些可插拔的功能上，解除程序依赖。
 			parseLookupOverrideSubElements(ele, bd.getMethodOverrides());
-
+			// replaced-method ：可以在运行时调用新的方法替换现有的方法，还能动态的更新原有方法的逻辑
 			parseReplacedMethodSubElements(ele, bd.getMethodOverrides());
 			// constructor-arg：对bean自动寻找对应的构造函数，并在初始化的时候将设置的参数传入进去
 			parseConstructorArgElements(ele, bd);
+			// 解析property属性
 			parsePropertyElements(ele, bd);
+			// 解析Qualifier属性，用于指定根据名字装配bean，消除歧义
 			parseQualifierElements(ele, bd);
 
 			bd.setResource(this.readerContext.getResource());
@@ -756,6 +758,8 @@ public class BeanDefinitionParserDelegate {
 				String value = metaElement.getAttribute(VALUE_ATTRIBUTE);
 				BeanMetadataAttribute attribute = new BeanMetadataAttribute(key, value);
 				attribute.setSource(extractSource(metaElement));
+				// BeanDefinition继承BeanMetadataAttributeAccessor
+				// 解析完之后放进BeanDefinition的BeanMetadataAttribute属性里面在使用的时候直接get就行了
 				attributeAccessor.addMetadataAttribute(attribute);
 			}
 		}
@@ -834,6 +838,7 @@ public class BeanDefinitionParserDelegate {
 				Element ele = (Element) node;
 				String methodName = ele.getAttribute(NAME_ATTRIBUTE);
 				String beanRef = ele.getAttribute(BEAN_ELEMENT);
+				// 会生成一个MethodOverride对象放进BeanDefinition对象中
 				LookupOverride override = new LookupOverride(methodName, beanRef);
 				override.setSource(extractSource(ele));
 				overrides.addOverride(override);
@@ -863,6 +868,7 @@ public class BeanDefinitionParserDelegate {
 					}
 				}
 				replaceOverride.setSource(extractSource(replacedMethodEle));
+				// 会生成一个MethodOverride对象放进BeanDefinition对象中
 				overrides.addOverride(replaceOverride);
 			}
 		}
@@ -872,9 +878,13 @@ public class BeanDefinitionParserDelegate {
 	 * Parse a constructor-arg element.
 	 */
 	public void parseConstructorArgElement(Element ele, BeanDefinition bd) {
+		// 在构造参数中的位置
 		String indexAttr = ele.getAttribute(INDEX_ATTRIBUTE);
+		// 参数的类型
 		String typeAttr = ele.getAttribute(TYPE_ATTRIBUTE);
+		// 构造参数的名字
 		String nameAttr = ele.getAttribute(NAME_ATTRIBUTE);
+		// 设置了index属性的解析方式
 		if (StringUtils.hasLength(indexAttr)) {
 			try {
 				int index = Integer.parseInt(indexAttr);
@@ -884,7 +894,9 @@ public class BeanDefinitionParserDelegate {
 				else {
 					try {
 						this.parseState.push(new ConstructorArgumentEntry(index));
+						// Value类型返回ValueHolder，ref类型返回RuntimeBeanReference
 						Object value = parsePropertyValue(ele, bd, null);
+						// 使用ValueHolder封装
 						ConstructorArgumentValues.ValueHolder valueHolder = new ConstructorArgumentValues.ValueHolder(value);
 						if (StringUtils.hasLength(typeAttr)) {
 							valueHolder.setType(typeAttr);
@@ -1012,6 +1024,7 @@ public class BeanDefinitionParserDelegate {
 		Element subElement = null;
 		for (int i = 0; i < nl.getLength(); i++) {
 			Node node = nl.item(i);
+			// 如果是description或者是meta就不做处理
 			if (node instanceof Element && !nodeNameEquals(node, DESCRIPTION_ELEMENT) &&
 					!nodeNameEquals(node, META_ELEMENT)) {
 				// Child element is what we're looking for.
@@ -1026,27 +1039,32 @@ public class BeanDefinitionParserDelegate {
 
 		boolean hasRefAttribute = ele.hasAttribute(REF_ATTRIBUTE);
 		boolean hasValueAttribute = ele.hasAttribute(VALUE_ATTRIBUTE);
+		// 不能同时存在value和ref属性
 		if ((hasRefAttribute && hasValueAttribute) ||
 				((hasRefAttribute || hasValueAttribute) && subElement != null)) {
 			error(elementName +
 					" is only allowed to contain either 'ref' attribute OR 'value' attribute OR sub-element", ele);
 		}
-
+		// 存在ref属性的时候的解析方式
 		if (hasRefAttribute) {
 			String refName = ele.getAttribute(REF_ATTRIBUTE);
 			if (!StringUtils.hasText(refName)) {
 				error(elementName + " contains empty 'ref' attribute", ele);
 			}
+			// 在解析生成BeanDefinition阶段指向其他bean的指针被封装成RuntimeBeanReference对象，在实例化的时候才会真正转换成实例的引用
 			RuntimeBeanReference ref = new RuntimeBeanReference(refName);
 			ref.setSource(extractSource(ele));
 			return ref;
 		}
+		// 存在value属性时候的解析方式
 		else if (hasValueAttribute) {
+			// value的方式直接赋值吧。。。。。。。
 			TypedStringValue valueHolder = new TypedStringValue(ele.getAttribute(VALUE_ATTRIBUTE));
 			valueHolder.setSource(extractSource(ele));
 			return valueHolder;
 		}
 		else if (subElement != null) {
+			// 当有子元素的时候，就是那种<list></list> / <set></set> / <map></map> / <props></props> etc.
 			return parsePropertySubElement(subElement, bd);
 		}
 		else {
