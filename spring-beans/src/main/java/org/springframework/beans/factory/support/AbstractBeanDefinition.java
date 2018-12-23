@@ -1091,8 +1091,10 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 		}
 		else if (count == 1) {
 			// Mark override as not overloaded, to avoid the overhead of arg type checking.
+			// 当只有一个函数匹配的时候说明没有重写的方法，这是后直接目标函数就是这个函数
 			mo.setOverloaded(false);
 		}
+		// 当匹配不止一个的时候，后续生成代理的时候需要进行参数类型匹配才能确定要override的方法
 	}
 
 

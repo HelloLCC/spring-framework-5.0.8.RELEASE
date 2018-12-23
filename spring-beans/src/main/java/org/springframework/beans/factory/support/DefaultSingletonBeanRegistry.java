@@ -98,6 +98,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	private boolean singletonsCurrentlyInDestruction = false;
 
 	/** Disposable bean instances: bean name --> disposable instance */
+	// spring是作为一个注册中心的样子，在容器shutdown的时候，直接从这里面找到需要执行destory钩子的Bean
 	private final Map<String, Object> disposableBeans = new LinkedHashMap<>();
 
 	/** Map between containing bean names: bean name --> Set of bean names that the bean contains */
@@ -109,7 +110,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	/** Map between depending bean names: bean name --> Set of bean names for the bean's dependencies */
 	private final Map<String, Set<String>> dependenciesForBeanMap = new ConcurrentHashMap<>(64);
 
-
+	// 注册单例bean
 	@Override
 	public void registerSingleton(String beanName, Object singletonObject) throws IllegalStateException {
 		Assert.notNull(beanName, "Bean name must not be null");
@@ -130,12 +131,15 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 * @param beanName the name of the bean
 	 * @param singletonObject the singleton object
 	 */
+	// 真正用来注册单例bean的方法
 	protected void addSingleton(String beanName, Object singletonObject) {
 		synchronized (this.singletonObjects) {
 			this.singletonObjects.put(beanName, singletonObject);
-			// TODO
+			// TODO singletonObjects、earlySingletonObjects和singletonFactories互斥
 			this.singletonFactories.remove(beanName);
 			this.earlySingletonObjects.remove(beanName);
+			// 一旦一个bean完成注册之后beanName加入registeredSingletons
+			// 只有当this.singletonObjects.put和this.singletonFactories.put之后才会调用add
 			this.registeredSingletons.add(beanName);
 		}
 	}
@@ -153,7 +157,9 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 		synchronized (this.singletonObjects) {
 			if (!this.singletonObjects.containsKey(beanName)) {
 				this.singletonFactories.put(beanName, singletonFactory);
+				// 互斥
 				this.earlySingletonObjects.remove(beanName);
+				// 唯二的调用的地方
 				this.registeredSingletons.add(beanName);
 			}
 		}
@@ -173,6 +179,8 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 * @param allowEarlyReference whether early references should be created or not
 	 * @return the registered singleton object, or {@code null} if none found
 	 */
+	// 这里如果找不到bean，其实是不会去加载bean的，会直接返回null
+	//
 	@Nullable
 	protected Object getSingleton(String beanName, boolean allowEarlyReference) {
 		// 由于scope是singleton，所以先从缓存中取单例对象的实例，如果取到直接返回，没有取到加载bean
@@ -181,7 +189,10 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 		if (singletonObject == null && isSingletonCurrentlyInCreation(beanName)) {
 			// 锁住单例缓存区加载bean
 			synchronized (this.singletonObjects) {
-				// 去earlySingletonObjects中去找对象实例
+				// TODO 去earlySingletonObjects中去找对象实例
+				// 注意singletonObjects \ earlySingletonObjects \ singletonFactories三个之间的转换关系
+				// getBean的时候首先去singletonObjects[已经实例化、初始化完成的bean]中去取 null
+				// 再去earlySingletonObjects中去找，这里面需要设置allowEarlyReference为true，其实earlySingletonObjects和singletonFactories是用来解循环引用的
 				singletonObject = this.earlySingletonObjects.get(beanName);
 				if (singletonObject == null && allowEarlyReference) {
 					// 去singletonFactories中去找对象的实例
@@ -231,6 +242,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 				}
 				try {
 					// 此处就是一个回调方法，调用上一层的getObject()方法
+					// TODO 这个方法回调去创建bean
 					singletonObject = singletonFactory.getObject();
 					newSingleton = true;
 				}

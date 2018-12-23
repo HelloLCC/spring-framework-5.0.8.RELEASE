@@ -151,9 +151,11 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 	private final List<BeanPostProcessor> beanPostProcessors = new ArrayList<>();
 
 	/** Indicates whether any InstantiationAwareBeanPostProcessors have been registered */
+	// 是否注册了可以感知bean初始化的事件的beanPostProcessor
 	private boolean hasInstantiationAwareBeanPostProcessors;
 
 	/** Indicates whether any DestructionAwareBeanPostProcessors have been registered */
+	// 是否注册了可以感知bean销毁的事件的beanPostProcessor
 	private boolean hasDestructionAwareBeanPostProcessors;
 
 	/** Map from scope identifier String to corresponding Scope */
@@ -1409,12 +1411,16 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 	@Nullable
 	private Class<?> doResolveBeanClass(RootBeanDefinition mbd, Class<?>... typesToMatch)
 			throws ClassNotFoundException {
-
+		// 默认获取的是当前的ContextClassLoader，
+		// 如果ContextClassLoader为空，就是ClassUtils.class.getClassLoader()
+		// 如果ClassUtils.class.getClassLoader()为空，就是SystemClassLoader
+		// TODO 这里也是为了打破双亲委派模型
 		ClassLoader beanClassLoader = getBeanClassLoader();
 		ClassLoader classLoaderToUse = beanClassLoader;
 		if (!ObjectUtils.isEmpty(typesToMatch)) {
 			// When just doing type checks (i.e. not creating an actual instance yet),
 			// use the specified temporary class loader (e.g. in a weaving scenario).
+			// 如果是进行类型校验使用临时classloader
 			ClassLoader tempClassLoader = getTempClassLoader();
 			if (tempClassLoader != null) {
 				classLoaderToUse = tempClassLoader;
